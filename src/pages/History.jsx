@@ -4,8 +4,6 @@ import { HistoryTable } from '../components/HistoryTable';
 import { loadHistoryFromLocalStorage } from '../composables/historyCompose';
 import { selectHistory } from '../stores/slices/historySlice';
 
-
-
 export const History = () => {
   const dispatch = useDispatch();
   const historyData = useSelector(selectHistory);
