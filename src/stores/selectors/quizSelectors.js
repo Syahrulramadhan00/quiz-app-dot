@@ -1,4 +1,4 @@
-// features/quiz/quizSelector.js
+
 export const selectQuiz = (state) => state.quiz.quiz
 export const selectQuestions = (state) => state.quiz.quiz.questions
 export const selectCurrentQuestion = (state) =>

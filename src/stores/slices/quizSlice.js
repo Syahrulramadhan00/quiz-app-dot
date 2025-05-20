@@ -1,14 +1,14 @@
 import { createSlice } from "@reduxjs/toolkit"
 
 const initialState = {
-    quiz: {
-        questions: [],
-        currentQuestionIndex: 0,
-        score: 0,
-        answers: [],
-        isLoading: false,
-        error: null,
-    },
+  quiz: {
+    questions: [],
+    currentQuestionIndex: 0,
+    score: 0,
+    answers: [],
+    isLoading: false,
+    error: null,
+  },
 }
 
 const quizSlice = createSlice({
@@ -35,8 +35,6 @@ const quizSlice = createSlice({
       if (!currentQuestion) return
 
       const prevAnswer = state.quiz.answers[currentIndex]
-
-      // Check if we're correcting an earlier wrong answer
       const wasCorrect = prevAnswer === currentQuestion.correctAnswer
       const isCorrect = answer === currentQuestion.correctAnswer
 
@@ -62,30 +60,20 @@ const quizSlice = createSlice({
     loadFromStorage: (state, action) => {
       const { questions, answers, currentQuestionIndex } = action.payload
       state.quiz.questions = questions
-      state.quiz.answers = answers
-      state.quiz.currentQuestionIndex = currentQuestionIndex
+      state.quiz.answers = answers || Array(questions.length).fill(null)
+      state.quiz.currentQuestionIndex = currentQuestionIndex || 0
     },
-  },  
-  extraReducers: (builder) => {
-    builder.addCase('quiz/loadFromStorage', (state, action) => {
-      const { questions, answers, currentQuestionIndex } = action.payload
-      state.questions = questions
-      state.answers = answers || Array(questions.length).fill(null)
-      state.currentQuestionIndex = currentQuestionIndex || 0
-    })
-  }
+  },
 })
 
-
-
 export const {
-    fetchQuestionsStart,
-    fetchQuestionsSuccess,
-    fetchQuestionsFailure,
-    answerQuestion,
-    resetQuiz,
-    goToQuestion,
-    loadFromStorage,
+  fetchQuestionsStart,
+  fetchQuestionsSuccess,
+  fetchQuestionsFailure,
+  answerQuestion,
+  resetQuiz,
+  goToQuestion,
+  loadFromStorage,
 } = quizSlice.actions
 
 export default quizSlice.reducer

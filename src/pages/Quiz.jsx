@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   selectCurrentQuestion,
@@ -6,7 +7,7 @@ import {
   selectError,
   selectLoading,
 } from '../stores/selectors/quizSelectors'
-import { answerQuestion, goToQuestion } from '../stores/slices/quizSlice'
+import { answerQuestion, goToQuestion, loadFromStorage, resetQuiz } from '../stores/slices/quizSlice'
 import QuestionSheet from '../components/QuestionSheet'
 import NavigationQuestion from '../components/NavigationQuestion'
 
@@ -14,100 +15,57 @@ const LOCAL_STORAGE_KEY = 'ongoing_quiz'
 
 export const Quiz = () => {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
+
   const quiz = useSelector(selectQuiz)
   const currentQuestion = useSelector(selectCurrentQuestion)
   const isLoading = useSelector(selectLoading)
   const error = useSelector(selectError)
-const [selectedAnswer, setSelectedAnswer] = useState(null)
-const [questionStatus, setQuestionStatus] = useState([])
-const [hasRestored, setHasRestored] = useState(false) 
 
+  const [selectedAnswer, setSelectedAnswer] = useState(null)
+  const [questionStatus, setQuestionStatus] = useState([])
+  const [hasRestored, setHasRestored] = useState(false)
 
-  // ✅ Load saved progress from localStorage on mount
-useEffect(() => {
-  if (!hasRestored && !isLoading) {
-    const savedQuiz = localStorage.getItem(LOCAL_STORAGE_KEY)
-    const parsed = savedQuiz && JSON.parse(savedQuiz)
+  // ✅ Load saved progress from localStorage
+  useEffect(() => {
+    if (!hasRestored && !isLoading) {
+      const savedQuiz = localStorage.getItem(LOCAL_STORAGE_KEY)
+      const parsed = savedQuiz && JSON.parse(savedQuiz)
 
-    console.log('Restoring quiz from localStorage:', parsed)
+    if (parsed && parsed.questions?.length > 0) {
+    dispatch(loadFromStorage(parsed))
+    setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
+    setHasRestored(true)
 
-    if (parsed && parsed.questions && parsed.questions.length > 0) {
-      // ✅ Manually restore quiz state if Redux quiz.questions is empty
-      dispatch({
-        type: 'quiz/loadFromStorage', // custom action (you need to handle this)
-        payload: {
-          questions: parsed.questions,
-          answers: parsed.answers,
-          currentQuestionIndex: parsed.currentQuestionIndex,
-        },
-      })
-
-      setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
-      setHasRestored(true)
-    } else if (quiz.questions.length > 0) {
-      // fallback to initializing with Redux-loaded questions
-      setQuestionStatus(Array(quiz.questions.length).fill('unanswered'))
-      setHasRestored(true)
+        setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
+        setHasRestored(true)
+      } else if (quiz.questions.length > 0) {
+        setQuestionStatus(Array(quiz.questions.length).fill('unanswered'))
+        setHasRestored(true)
+      }
     }
-  }
-}, [quiz.questions.length, hasRestored, dispatch, isLoading])
+  }, [quiz.questions.length, hasRestored, dispatch, isLoading])
+
+  // ✅ Save to localStorage on updates
+  useEffect(() => {
+    if (quiz.questions.length > 0) {
+      const allAnswered = questionStatus.every((s) => s === 'answered')
+
+      localStorage.setItem(
+        LOCAL_STORAGE_KEY,
+        JSON.stringify({
+          questions: quiz.questions,
+          currentQuestionIndex: quiz.currentQuestionIndex,
+          answers: quiz.answers,
+          questionStatus,
+          completed: allAnswered,
+        })
+      )
+    }
+  }, [quiz.questions, quiz.currentQuestionIndex, quiz.answers, questionStatus])
 
 
-useEffect(() => {
-  console.log('[Debug] hasRestored:', hasRestored)
-  console.log('[Debug] isLoading:', isLoading)
-  console.log('[Debug] quiz.questions.length:', quiz.questions.length)
-}, [hasRestored, isLoading, quiz.questions.length])
-
-useEffect(() => {
-  console.log('Redux state after restore:', quiz)
-}, [quiz])
-
-
-
-
-
-  // ✅ Save to localStorage on any change
-useEffect(() => {
-  if (quiz.questions.length > 0) {
-    const allAnswered = questionStatus.every((s) => s === 'answered')
-
-    localStorage.setItem(
-      LOCAL_STORAGE_KEY,
-      JSON.stringify({
-        questions: quiz.questions, // ✅ add this
-        currentQuestionIndex: quiz.currentQuestionIndex,
-        answers: quiz.answers,
-        questionStatus,
-        completed: allAnswered,
-      })
-    )
-  }
-}, [quiz.questions, quiz.currentQuestionIndex, quiz.answers, questionStatus])
-
-
-  // ✅ Save to history and clear ongoing quiz if completed
-useEffect(() => {
-  const allAnswered = questionStatus.length > 0 &&
-    questionStatus.every((s) => s === 'answered')
-
-  if (allAnswered) {
-    const history = JSON.parse(localStorage.getItem('quiz_history') || '[]')
-    const updatedHistory = [
-      ...history,
-      {
-        completedAt: new Date().toISOString(),
-        answers: quiz.answers,
-        questions: quiz.questions,
-      },
-    ]
-
-    localStorage.setItem('quiz_history', JSON.stringify(updatedHistory))
-    // localStorage.removeItem(LOCAL_STORAGE_KEY)
-  }
-}, [questionStatus])
-
-
+  // ✅ Handle answer click
   const handleAnswerClick = (answer) => {
     setSelectedAnswer(answer)
 
@@ -126,12 +84,49 @@ useEffect(() => {
     }, 800)
   }
 
+
+const handleSubmit = () => {
+  const totalQuestions = quiz.questions.length
+  let correctCount = 0
+  let wrongCount = 0
+
+  quiz.questions.forEach((q, idx) => {
+    const selected = quiz.answers[idx]
+    if (selected === q.correctAnswer) {
+      correctCount++
+    } else {
+      wrongCount++
+    }
+  })
+
+  // ✅ Save only result summary (NOT questions/answers)
+  const results = JSON.parse(localStorage.getItem('quiz_results') || '[]')
+  const updatedResults = [
+    ...results,
+    {
+      submittedAt: new Date().toISOString(),
+      totalQuestions,
+      correctCount,
+      wrongCount,
+    },
+  ]
+
+  localStorage.setItem('quiz_results', JSON.stringify(updatedResults))
+  localStorage.removeItem(LOCAL_STORAGE_KEY)
+  dispatch(resetQuiz())
+  navigate('/history')
+}
+
+
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4'>
       <NavigationQuestion />
       {isLoading && <p className='text-center mt-10'>Loading...</p>}
       {error && <p className='text-red-500 text-center mt-10'>Error: {error}</p>}
-      {!currentQuestion && !isLoading && !error && <p className='text-center mt-10'>No question found</p>}
+      {!currentQuestion && !isLoading && !error && (
+        <p className='text-center mt-10'>No question found</p>
+      )}
+
       {currentQuestion && (
         <QuestionSheet
           questionData={currentQuestion}
@@ -140,6 +135,15 @@ useEffect(() => {
           selectedAnswer={selectedAnswer || quiz.answers[quiz.currentQuestionIndex]}
           onAnswerClick={handleAnswerClick}
         />
+      )}
+
+      {quiz.questions.length > 0 && (
+        <button
+          onClick={handleSubmit}
+          className='mt-6 bg-primary text-white font-medium py-2 px-4 rounded hover:bg-primary/90 transition'
+        >
+          Submit Quiz
+        </button>
       )}
     </div>
   )
