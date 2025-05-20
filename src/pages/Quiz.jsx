@@ -17,6 +17,7 @@ import {
 } from '../composables/quizCompose'
 import { useQuestionStatus } from '../hooks/useQuestionStatus'
 import { processAnswer } from '../helpers/handleAnswersClick'
+import { TimerQuiz } from '../components/TimerQuiz'
 
 export const Quiz = () => {
   const dispatch = useDispatch()
@@ -29,7 +30,7 @@ export const Quiz = () => {
   const error = useSelector(selectError)
 
   const [selectedAnswer, setSelectedAnswer] = useState(null)
-  const [hasRestored, setHasRestored] = useState(false) // ✅ must be declared BEFORE using it below
+  const [hasRestored, setHasRestored] = useState(false) 
   const [questionStatus, setQuestionStatus] = useQuestionStatus(quiz, hasRestored)
 
   // ✅ Load saved progress from localStorage
@@ -54,7 +55,6 @@ export const Quiz = () => {
     }
   }, [quiz.questions, quiz.currentQuestionIndex, quiz.answers, questionStatus, dispatch])
 
-  // ✅ Answer click
   const handleAnswerClick = (answer) => {
     setSelectedAnswer(answer)
     setTimeout(() => {
@@ -106,6 +106,11 @@ const handleSubmit = () => {
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4'>
+        {quiz.questions.length > 0 && (
+        <div className="flex justify-center py-5">
+            <TimerQuiz totalQuestions={quiz.questions.length} onTimeUp={handleSubmit} />
+        </div>
+        )}
       <NavigationQuestion />
       {isLoading && <p className='text-center mt-10'>Loading...</p>}
       {error && <p className='text-red-500 text-center mt-10'>Error: {error}</p>}

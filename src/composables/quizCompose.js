@@ -11,7 +11,7 @@ import { throttle } from 'lodash'
 
 const LOCAL_STORAGE_KEY = 'ongoing_quiz'
 
-// 🚀 Fetch questions from API
+// Fetch questions from API
 export const fetchQuizQuestions = (amount) => async (dispatch) => {
   try {
     dispatch(fetchQuestionsStart());
@@ -30,14 +30,14 @@ export const fetchQuizQuestions = (amount) => async (dispatch) => {
   }
 }
 
-// ✅ Throttled version
+// Throttled version
 export const throttledFetchQuizQuestions = throttle(
   (amount) => (dispatch) => dispatch(fetchQuizQuestions(amount)),
   5000,
   { leading: true, trailing: false }
 )
 
-// ✅ Load saved quiz progress from localStorage
+// Load saved quiz progress from localStorage
 export const loadQuizFromLocalStorage = createAsyncThunk(
   'quiz/loadQuizFromLocalStorage',
   async (_, { dispatch }) => {
@@ -58,7 +58,7 @@ export const loadQuizFromLocalStorage = createAsyncThunk(
   }
 )
 
-// ✅ Save quiz progress to localStorage
+// Save quiz progress to localStorage
 export const saveQuizToLocalStorage = createAsyncThunk(
   'quiz/saveQuizToLocalStorage',
   async ({ quiz, questionStatus }) => {
