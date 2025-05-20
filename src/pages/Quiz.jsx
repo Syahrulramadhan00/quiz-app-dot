@@ -7,15 +7,21 @@ import {
   selectError,
   selectLoading,
 } from '../stores/selectors/quizSelectors'
-import { answerQuestion, goToQuestion, loadFromStorage, resetQuiz } from '../stores/slices/quizSlice'
+import { answerQuestion, goToQuestion, resetQuiz } from '../stores/slices/quizSlice'
 import QuestionSheet from '../components/QuestionSheet'
 import NavigationQuestion from '../components/NavigationQuestion'
+import {
+  loadQuizFromLocalStorage,
+  saveQuizToLocalStorage,
 
-const LOCAL_STORAGE_KEY = 'ongoing_quiz'
+} from '../composables/quizCompose'
+import { useQuestionStatus } from '../hooks/useQuestionStatus'
+import { processAnswer } from '../helpers/handleAnswersClick'
 
 export const Quiz = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const LOCAL_STORAGE_KEY = 'ongoing_quiz'
 
   const quiz = useSelector(selectQuiz)
   const currentQuestion = useSelector(selectCurrentQuestion)
@@ -23,68 +29,49 @@ export const Quiz = () => {
   const error = useSelector(selectError)
 
   const [selectedAnswer, setSelectedAnswer] = useState(null)
-  const [questionStatus, setQuestionStatus] = useState([])
-  const [hasRestored, setHasRestored] = useState(false)
+  const [hasRestored, setHasRestored] = useState(false) // ✅ must be declared BEFORE using it below
+  const [questionStatus, setQuestionStatus] = useQuestionStatus(quiz, hasRestored)
 
   // ✅ Load saved progress from localStorage
   useEffect(() => {
     if (!hasRestored && !isLoading) {
-      const savedQuiz = localStorage.getItem(LOCAL_STORAGE_KEY)
-      const parsed = savedQuiz && JSON.parse(savedQuiz)
-
-    if (parsed && parsed.questions?.length > 0) {
-    dispatch(loadFromStorage(parsed))
-    setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
-    setHasRestored(true)
-
-        setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
+      dispatch(loadQuizFromLocalStorage()).then((res) => {
+        const parsed = res.payload
+        if (parsed && parsed.questions?.length > 0) {
+          setQuestionStatus(parsed.questionStatus || Array(parsed.questions.length).fill('unanswered'))
+        } else if (quiz.questions.length > 0) {
+          setQuestionStatus(Array(quiz.questions.length).fill('unanswered'))
+        }
         setHasRestored(true)
-      } else if (quiz.questions.length > 0) {
-        setQuestionStatus(Array(quiz.questions.length).fill('unanswered'))
-        setHasRestored(true)
-      }
+      })
     }
   }, [quiz.questions.length, hasRestored, dispatch, isLoading])
 
   // ✅ Save to localStorage on updates
   useEffect(() => {
     if (quiz.questions.length > 0) {
-      const allAnswered = questionStatus.every((s) => s === 'answered')
-
-      localStorage.setItem(
-        LOCAL_STORAGE_KEY,
-        JSON.stringify({
-          questions: quiz.questions,
-          currentQuestionIndex: quiz.currentQuestionIndex,
-          answers: quiz.answers,
-          questionStatus,
-          completed: allAnswered,
-        })
-      )
+      dispatch(saveQuizToLocalStorage({ quiz, questionStatus }))
     }
-  }, [quiz.questions, quiz.currentQuestionIndex, quiz.answers, questionStatus])
+  }, [quiz.questions, quiz.currentQuestionIndex, quiz.answers, questionStatus, dispatch])
 
-
-  // ✅ Handle answer click
+  // ✅ Answer click
   const handleAnswerClick = (answer) => {
     setSelectedAnswer(answer)
-
     setTimeout(() => {
-      dispatch(answerQuestion({ answer, index: quiz.currentQuestionIndex }))
-
-      const updatedStatus = [...questionStatus]
-      updatedStatus[quiz.currentQuestionIndex] = 'answered'
-      setQuestionStatus(updatedStatus)
-
-      if (quiz.currentQuestionIndex < quiz.questions.length - 1) {
-        dispatch(goToQuestion(quiz.currentQuestionIndex + 1))
-      }
-
-      setSelectedAnswer(null)
+      processAnswer({
+        answer,
+        currentQuestionIndex: quiz.currentQuestionIndex,
+        dispatch,
+        setQuestionStatus,
+        questionStatus,
+        quizLength: quiz.questions.length,
+        goToQuestion,
+        answerQuestion,
+        setSelectedAnswer,
+      })
     }, 800)
   }
-
-
+  
 const handleSubmit = () => {
   const totalQuestions = quiz.questions.length
   let correctCount = 0
@@ -116,7 +103,6 @@ const handleSubmit = () => {
   dispatch(resetQuiz())
   navigate('/history')
 }
-
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4'>
